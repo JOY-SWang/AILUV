@@ -1,6 +1,8 @@
 const MIME_TYPES = [
-  "audio/webm;codecs=opus",
+  "audio/mpeg",
+  "audio/mp4;codecs=mp4a.40.2",
   "audio/mp4",
+  "audio/webm;codecs=opus",
   "audio/ogg;codecs=opus",
   "audio/webm",
 ] as const;
@@ -54,11 +56,20 @@ export async function requestMicrophone(): Promise<MediaStream> {
   });
 }
 
-function preferredMimeType(): string {
-  if (!window.MediaRecorder) return "";
-  return (
-    MIME_TYPES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ""
-  );
+function createMediaRecorder(stream: MediaStream): MediaRecorder {
+  for (const mimeType of MIME_TYPES) {
+    if (!MediaRecorder.isTypeSupported(mimeType)) continue;
+    try {
+      return new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128_000,
+      });
+    } catch {
+      // Some mobile browsers report a MIME type as supported but reject it
+      // when the recorder is created. Continue to the next compatible type.
+    }
+  }
+  return new MediaRecorder(stream);
 }
 
 export class LocalRecorder {
@@ -127,18 +138,13 @@ export class LocalRecorder {
       }
     }
 
-    const mimeType = preferredMimeType();
     let recorder: MediaRecorder;
     try {
-      recorder = mimeType
-        ? new MediaRecorder(recorderStream, { mimeType })
-        : new MediaRecorder(recorderStream);
+      recorder = createMediaRecorder(recorderStream);
     } catch {
       this.releaseProcessing();
       try {
-        recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream);
+        recorder = createMediaRecorder(stream);
       } catch (error) {
         for (const track of stream.getTracks()) track.stop();
         throw error;

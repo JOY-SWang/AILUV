@@ -16,34 +16,45 @@ const QUESTION_AUDIO_URL = new URL(
 
 const SYLLABLE_SECONDS = 1;
 
+export type CuePlaybackMode = "demo" | "recording";
+
 let activeAudio: HTMLAudioElement | null = null;
 let activeFrame: number | null = null;
 let activeStop: (() => void) | null = null;
 
-function audioUrl(stage: MockStage): string {
+function audioUrl(stage: MockStage): string | null {
   if (stage.number === 1) return HUMMING_AUDIO_URL;
   if (stage.number === 2 || stage.number === 3) return SENTENCE_AUDIO_URL;
-  return QUESTION_AUDIO_URL;
+  if (stage.number === 5) return QUESTION_AUDIO_URL;
+  return null;
 }
 
-function cueVolume(stage: MockStage, currentTime: number): number {
-  if (stage.key !== "UNISON_FADE") return 1;
-  const volumes = [1, 0.72, 0.42, 0.18] as const;
-  const segmentIndex = Math.min(
-    volumes.length - 1,
-    Math.floor(currentTime / SYLLABLE_SECONDS),
-  );
-  return volumes[segmentIndex] ?? 0.18;
+export function stageHasAudio(stage: MockStage): boolean {
+  return audioUrl(stage) != null;
+}
+
+function cueVolume(
+  stage: MockStage,
+  currentTime: number,
+  duration: number,
+  mode: CuePlaybackMode,
+): number {
+  if (stage.key !== "UNISON_FADE" || mode === "demo") return 1;
+  const progress = Math.min(1, Math.max(0, currentTime / duration));
+  return 0.5 * (1 - progress);
 }
 
 export async function playStageCue(
   stage: MockStage,
   onSegment?: (ordinal: number) => void,
+  mode: CuePlaybackMode = "demo",
 ): Promise<void> {
   stopStageCue();
+  const url = audioUrl(stage);
+  if (!url) return;
 
   await new Promise<void>((resolve, reject) => {
-    const audio = new Audio(audioUrl(stage));
+    const audio = new Audio(url);
     let finished = false;
     let lastOrdinal = 0;
 
@@ -76,11 +87,18 @@ export async function playStageCue(
         lastOrdinal = ordinal;
         onSegment?.(ordinal);
       }
-      audio.volume = cueVolume(stage, audio.currentTime);
+      const duration =
+        Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : stage.autoStopMs / 1_000;
+      audio.volume = cueVolume(stage, audio.currentTime, duration, mode);
       activeFrame = window.requestAnimationFrame(updateTimeline);
     };
 
     function handleEnded(): void {
+      if (stage.key === "UNISON_FADE" && mode === "recording") {
+        audio.volume = 0;
+      }
       onSegment?.(MOCK_SESSION.task.syllables.length);
       finish();
     }
@@ -95,6 +113,12 @@ export async function playStageCue(
     }
 
     audio.preload = "auto";
+    audio.volume = cueVolume(
+      stage,
+      0,
+      stage.autoStopMs / 1_000,
+      mode,
+    );
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("error", handleError);
     activeAudio = audio;

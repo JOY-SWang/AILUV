@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 
-import { playStageCue, stopStageCue } from "./audioCue";
+import { playStageCue, stageHasAudio, stopStageCue } from "./audioCue";
 import {
   MOCK_SESSION,
   MOCK_SESSION_CODE,
@@ -149,10 +149,18 @@ function pathFor(screen: Screen, stageNo: number): string {
 }
 
 function recordingExtension(mimeType: string): string {
+  if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return "mp3";
   if (mimeType.includes("mp4")) return "m4a";
+  if (mimeType.includes("aac")) return "m4a";
   if (mimeType.includes("ogg")) return "ogg";
   if (mimeType.includes("wav")) return "wav";
   return "webm";
+}
+
+function recordingFormatLabel(mimeType: string): string {
+  const extension = recordingExtension(mimeType);
+  if (extension === "m4a") return "M4A / AAC";
+  return extension.toUpperCase();
 }
 
 function PatientShell({
@@ -531,7 +539,10 @@ function StagePage({
   onReset: () => void;
 }) {
   const stage = mockStage(stageNo);
-  const [phase, setPhase] = useState<PracticePhase>("INTRO");
+  const hasAudio = stageHasAudio(stage);
+  const [phase, setPhase] = useState<PracticePhase>(
+    hasAudio ? "INTRO" : "READY",
+  );
   const [activeSegment, setActiveSegment] = useState(0);
   const [countdown, setCountdown] = useState(stage.countdownSeconds);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -558,7 +569,7 @@ function StagePage({
 
   useEffect(() => {
     cancelledRef.current = false;
-    setPhase("INTRO");
+    setPhase(stageHasAudio(stage) ? "INTRO" : "READY");
     setActiveSegment(0);
     setCountdown(stage.countdownSeconds);
     setElapsedMs(0);
@@ -574,10 +585,14 @@ function StagePage({
       recorderRef.current?.abort();
       recorderRef.current = null;
     };
-  }, [clearTimer, stage.countdownSeconds, stageNo]);
+  }, [clearTimer, stage, stage.countdownSeconds, stageNo]);
 
   async function playDemo(): Promise<void> {
     if (phase === "DEMO_PLAYING") return;
+    if (!hasAudio) {
+      setPhase("READY");
+      return;
+    }
     setError(null);
     setPhase("DEMO_PLAYING");
     setActiveSegment(1);
@@ -640,7 +655,7 @@ function StagePage({
     setTapCount(0);
     setPhase("RECORDING");
     if (!stage.patientStopAllowed) {
-      void playStageCue(stage, setActiveSegment).catch((caught) => {
+      void playStageCue(stage, setActiveSegment, "recording").catch((caught) => {
         setError(
           caught instanceof Error
             ? caught.message
@@ -905,7 +920,8 @@ function StagePage({
                 <strong>Attempt saved locally</strong>
                 <small>
                   {(latestRecording.durationMs / 1000).toFixed(1)}s · Attempt{" "}
-                  {latestRecording.attemptNo}
+                  {latestRecording.attemptNo} ·{" "}
+                  {recordingFormatLabel(latestRecording.mimeType)}
                 </small>
               </span>
             </div>
@@ -916,8 +932,12 @@ function StagePage({
               Download
             </a>
           </div>
-          <audio controls preload="metadata" src={latestRecording.url}>
-            Your browser cannot play this local recording.
+          <audio controls preload="metadata">
+            <source
+              src={latestRecording.url}
+              type={latestRecording.mimeType}
+            />
+            Your browser cannot play this recording format.
           </audio>
           <p className="recording-playback-note">
             This demo boosts your voice on supported browsers. For the clearest
@@ -1077,11 +1097,14 @@ function CompletePage({
                     <strong>{mockStage(recording.stageNo).title}</strong>
                     <small>
                       Attempt {recording.attemptNo} ·{" "}
-                      {(recording.durationMs / 1000).toFixed(1)}s
+                      {(recording.durationMs / 1000).toFixed(1)}s ·{" "}
+                      {recordingFormatLabel(recording.mimeType)}
                     </small>
                   </span>
                 </div>
-                <audio controls preload="metadata" src={recording.url} />
+                <audio controls preload="metadata">
+                  <source src={recording.url} type={recording.mimeType} />
+                </audio>
                 <div className="recording-item__actions">
                   <a
                     href={recording.url}

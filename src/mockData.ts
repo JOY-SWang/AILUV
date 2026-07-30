@@ -9,7 +9,7 @@ export type MockStage = {
   title: string;
   demoInstruction: string;
   practiceInstruction: string;
-  cue: "humming" | "sentence" | "question";
+  cue: "humming" | "sentence" | "question" | "none";
   countdownSeconds: 0 | 3;
   pauseResumeAllowed: boolean;
   patientStopAllowed: boolean;
@@ -85,7 +85,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     title: "Your Turn Alone",
     demoInstruction: "Listen first",
     practiceInstruction: "Your Turn Alone",
-    cue: "question",
+    cue: "none",
     countdownSeconds: 3,
     pauseResumeAllowed: false,
     patientStopAllowed: true,

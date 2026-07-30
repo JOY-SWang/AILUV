@@ -12,6 +12,7 @@ Standalone, local-only mobile mock of the **M1.3 Checkpoint Patient ·
 - bundled stage-specific reference audio;
 - real microphone capture through `MediaRecorder`;
 - optional in-browser voice gain, compression, and live input metering;
+- mobile-friendly recording preference: MP3, then M4A/AAC, with WebM fallback;
 - local recording playback and download;
 - recording Blob persistence in this browser's IndexedDB.
 
