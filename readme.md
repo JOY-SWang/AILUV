@@ -9,8 +9,9 @@ Standalone, local-only mobile mock of the **M1.3 Checkpoint Patient ·
 - patient `M1.3 Checkpoint Patient`;
 - one task: `I want water`;
 - all five `mit-v1` patient stages;
-- browser-generated reference cues;
+- bundled stage-specific reference audio;
 - real microphone capture through `MediaRecorder`;
+- optional in-browser voice gain, compression, and live input metering;
 - local recording playback and download;
 - recording Blob persistence in this browser's IndexedDB.
 
@@ -20,7 +21,7 @@ not connect to FastAPI, PostgreSQL, MinIO, SoulX, or any other model.
 ## Local development
 
 ```sh
-npm install --ignore-scripts
+npm ci --ignore-scripts
 npm run dev
 ```
 
@@ -31,6 +32,17 @@ Microphone capture requires HTTPS except on `localhost`.
 Use this directory as the Vercel project root, or copy the directory contents
 into a new repository root. The included `vercel.json` supplies the Vite build,
 SPA fallback, security headers, and `microphone=(self)` permission policy.
+
+Commit `package-lock.json`, but do not commit `node_modules/` or `dist/`. Both
+are covered by `.gitignore`. If `node_modules/` was already committed, remove it
+from Git tracking before the next deployment:
+
+```sh
+git rm -r --cached node_modules dist
+git add .gitignore package.json package-lock.json vercel.json
+git commit -m "Fix clean Vercel dependency install"
+git push
+```
 
 After deployment, open:
 

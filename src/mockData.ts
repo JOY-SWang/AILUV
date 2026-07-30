@@ -51,7 +51,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     pauseResumeAllowed: true,
     patientStopAllowed: false,
     tappingInputEnabled: true,
-    autoStopMs: 4_200,
+    autoStopMs: 4_000,
   },
   {
     number: 2,
@@ -64,7 +64,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     pauseResumeAllowed: true,
     patientStopAllowed: false,
     tappingInputEnabled: false,
-    autoStopMs: 4_200,
+    autoStopMs: 4_000,
   },
   {
     number: 3,
@@ -77,7 +77,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     pauseResumeAllowed: true,
     patientStopAllowed: false,
     tappingInputEnabled: false,
-    autoStopMs: 4_200,
+    autoStopMs: 4_000,
   },
   {
     number: 4,
@@ -85,7 +85,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     title: "Your Turn Alone",
     demoInstruction: "Listen first",
     practiceInstruction: "Your Turn Alone",
-    cue: "sentence",
+    cue: "question",
     countdownSeconds: 3,
     pauseResumeAllowed: false,
     patientStopAllowed: true,

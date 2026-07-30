@@ -380,7 +380,7 @@ function IntroPage({
         <span className="headphones-note__icon" aria-hidden="true">◖◗</span>
         <div>
           <strong>Headphones recommended</strong>
-          <p>They can make the reference cue easier to hear clearly.</p>
+          <p>They keep the reference cue out of your recording so your voice is clearer.</p>
         </div>
       </article>
 
@@ -535,6 +535,7 @@ function StagePage({
   const [activeSegment, setActiveSegment] = useState(0);
   const [countdown, setCountdown] = useState(stage.countdownSeconds);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [inputLevel, setInputLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [tapCount, setTapCount] = useState(0);
   const [latestRecordingId, setLatestRecordingId] = useState<string | null>(null);
@@ -561,6 +562,7 @@ function StagePage({
     setActiveSegment(0);
     setCountdown(stage.countdownSeconds);
     setElapsedMs(0);
+    setInputLevel(0);
     setError(null);
     setTapCount(0);
     setLatestRecordingId(null);
@@ -617,6 +619,7 @@ function StagePage({
       onSaved(stored);
       setLatestRecordingId(stored.id);
       setElapsedMs(stored.durationMs);
+      setInputLevel(0);
       setActiveSegment(0);
       setPhase("REVIEW");
     } catch (caught) {
@@ -632,16 +635,24 @@ function StagePage({
     recorderRef.current = recorder;
     recorder.start();
     setElapsedMs(0);
+    setInputLevel(0);
     setActiveSegment(1);
     setTapCount(0);
     setPhase("RECORDING");
     if (!stage.patientStopAllowed) {
-      void playStageCue(stage, setActiveSegment);
+      void playStageCue(stage, setActiveSegment).catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "The local reference could not play.",
+        );
+      });
     }
     timerRef.current = window.setInterval(() => {
       const current = recorderRef.current?.elapsedMs() ?? 0;
       setElapsedMs(current);
-      setActiveSegment(Math.min(4, Math.floor(current / (stage.autoStopMs / 4)) + 1));
+      setInputLevel(recorderRef.current?.inputLevel() ?? 0);
+      setActiveSegment(Math.min(4, Math.floor(current / 1_000) + 1));
       if (current >= stage.autoStopMs) void finishRecording();
     }, 100);
   }
@@ -683,6 +694,7 @@ function StagePage({
     if (!recorder || !stage.pauseResumeAllowed) return;
     recorder.pause();
     stopStageCue();
+    setInputLevel(0);
     setPhase("PAUSED");
   }
 
@@ -700,6 +712,7 @@ function StagePage({
     }
     setError(null);
     setElapsedMs(0);
+    setInputLevel(0);
     setActiveSegment(0);
     setLatestRecordingId(null);
     setPhase("READY");
@@ -776,7 +789,7 @@ function StagePage({
             Play local demonstration
           </button>
           <p className="patient-hint">
-            The device generates this mock cue locally; no audio is downloaded.
+            This bundled session recording plays without a backend connection.
           </p>
         </>
       ) : null}
@@ -830,9 +843,22 @@ function StagePage({
             </button>
           ) : null}
           <div className="recording-panel" role="group" aria-label="Recording controls">
-            <div>
+            <div className="recording-panel__status">
               <span className="recording-live"><i /> Recording</span>
               <strong>{(elapsedMs / 1000).toFixed(1)}s</strong>
+              <span
+                className="mic-level"
+                role="meter"
+                aria-label="Microphone input level"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(inputLevel * 100)}
+              >
+                <i style={{ width: `${Math.max(3, inputLevel * 100)}%` }} />
+              </span>
+              <small className="mic-level__label">
+                {inputLevel >= 0.16 ? "Voice detected" : "Speak a little louder"}
+              </small>
             </div>
             {stage.pauseResumeAllowed ? (
               <button type="button" className="btn btn--secondary" onClick={pauseRecording}>
@@ -893,6 +919,10 @@ function StagePage({
           <audio controls preload="metadata" src={latestRecording.url}>
             Your browser cannot play this local recording.
           </audio>
+          <p className="recording-playback-note">
+            This demo boosts your voice on supported browsers. For the clearest
+            result, use headphones and keep the phone about 15–25 cm away.
+          </p>
           <div className="patient-nav-row">
             <button
               type="button"
