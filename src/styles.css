@@ -1155,6 +1155,12 @@ audio {
 }
 
 /* Evaluation */
+.stage-handoff {
+  display: grid;
+  gap: 9px;
+  margin-top: 4px;
+}
+
 .evaluation-mark {
   width: 54px;
   height: 54px;

@@ -11,8 +11,6 @@ export type MockStage = {
   practiceInstruction: string;
   cue: "humming" | "sentence" | "question" | "none";
   countdownSeconds: 0 | 3;
-  pauseResumeAllowed: boolean;
-  patientStopAllowed: boolean;
   tappingInputEnabled: boolean;
   autoStopMs: number;
 };
@@ -48,10 +46,8 @@ export const MOCK_STAGES: readonly MockStage[] = [
     practiceInstruction: "Hum with me",
     cue: "humming",
     countdownSeconds: 0,
-    pauseResumeAllowed: true,
-    patientStopAllowed: false,
     tappingInputEnabled: true,
-    autoStopMs: 4_000,
+    autoStopMs: 20_000,
   },
   {
     number: 2,
@@ -61,10 +57,8 @@ export const MOCK_STAGES: readonly MockStage[] = [
     practiceInstruction: "Sing with me",
     cue: "sentence",
     countdownSeconds: 0,
-    pauseResumeAllowed: true,
-    patientStopAllowed: false,
-    tappingInputEnabled: false,
-    autoStopMs: 4_000,
+    tappingInputEnabled: true,
+    autoStopMs: 20_000,
   },
   {
     number: 3,
@@ -74,10 +68,8 @@ export const MOCK_STAGES: readonly MockStage[] = [
     practiceInstruction: "Sing with me",
     cue: "sentence",
     countdownSeconds: 0,
-    pauseResumeAllowed: true,
-    patientStopAllowed: false,
-    tappingInputEnabled: false,
-    autoStopMs: 4_000,
+    tappingInputEnabled: true,
+    autoStopMs: 20_000,
   },
   {
     number: 4,
@@ -87,9 +79,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     practiceInstruction: "Your Turn Alone",
     cue: "none",
     countdownSeconds: 3,
-    pauseResumeAllowed: false,
-    patientStopAllowed: true,
-    tappingInputEnabled: false,
+    tappingInputEnabled: true,
     autoStopMs: 10_000,
   },
   {
@@ -100,9 +90,7 @@ export const MOCK_STAGES: readonly MockStage[] = [
     practiceInstruction: "Answer",
     cue: "question",
     countdownSeconds: 3,
-    pauseResumeAllowed: false,
-    patientStopAllowed: true,
-    tappingInputEnabled: false,
+    tappingInputEnabled: true,
     autoStopMs: 10_000,
   },
 ] as const;

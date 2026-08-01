@@ -38,7 +38,6 @@ type PracticePhase =
   | "READY"
   | "COUNTDOWN"
   | "RECORDING"
-  | "PAUSED"
   | "SAVING"
   | "REVIEW"
   | "ERROR";
@@ -373,7 +372,7 @@ function IntroPage({
           <span className="session-stat__icon session-stat__icon--clock" aria-hidden="true">⌁</span>
           <div>
             <strong>About {MOCK_SESSION.estimatedMinutes} minutes</strong>
-            <span>Pause whenever you need</span>
+            <span>Stop recording whenever you need</span>
           </div>
         </div>
       </article>
@@ -400,6 +399,44 @@ function IntroPage({
   );
 }
 
+function PatientStageList({
+  completedStages,
+  currentStageNo,
+}: {
+  completedStages: readonly number[];
+  currentStageNo: number | null;
+}) {
+  return (
+    <ol className="patient-stage-list">
+      {MOCK_STAGES.map((stage) => {
+        const completed = completedStages.includes(stage.number);
+        const current = stage.number === currentStageNo && !completed;
+        return (
+          <li
+            key={stage.number}
+            className={[
+              "patient-stage-item",
+              completed ? "patient-stage-item--complete" : "",
+              current ? "patient-stage-item--current" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <span className="patient-stage-badge" aria-hidden="true">
+              {completed ? "✓" : stage.number}
+            </span>
+            <span>
+              <strong>{stage.title}</strong>
+              <small>{stage.practiceInstruction}</small>
+            </span>
+            {current ? <span className="current-label">Next</span> : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function ProtocolPage({
   progress,
   onStart,
@@ -419,33 +456,10 @@ function ProtocolPage({
         </p>
       </div>
 
-      <ol className="patient-stage-list">
-        {MOCK_STAGES.map((stage) => {
-          const completed = progress.completedStages.includes(stage.number);
-          const current = stage.number === progress.stageNo && !completed;
-          return (
-            <li
-              key={stage.number}
-              className={[
-                "patient-stage-item",
-                completed ? "patient-stage-item--complete" : "",
-                current ? "patient-stage-item--current" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span className="patient-stage-badge" aria-hidden="true">
-                {completed ? "✓" : stage.number}
-              </span>
-              <span>
-                <strong>{stage.title}</strong>
-                <small>{stage.practiceInstruction}</small>
-              </span>
-              {current ? <span className="current-label">Next</span> : null}
-            </li>
-          );
-        })}
-      </ol>
+      <PatientStageList
+        completedStages={progress.completedStages}
+        currentStageNo={progress.stageNo}
+      />
 
       <article className="patient-card patient-card--info protocol-summary">
         <span>{progress.completedStages.length}/5 complete</span>
@@ -654,7 +668,7 @@ function StagePage({
     setActiveSegment(1);
     setTapCount(0);
     setPhase("RECORDING");
-    if (!stage.patientStopAllowed) {
+    if (stage.number <= 3) {
       void playStageCue(stage, setActiveSegment, "recording").catch((caught) => {
         setError(
           caught instanceof Error
@@ -673,10 +687,6 @@ function StagePage({
   }
 
   async function beginPractice(): Promise<void> {
-    if (stageRecordings.length >= 4) {
-      setError("This mock keeps the protocol limit of four Attempts per stage.");
-      return;
-    }
     setError(null);
     setPhase(stage.countdownSeconds ? "COUNTDOWN" : "READY");
     try {
@@ -704,27 +714,7 @@ function StagePage({
     }
   }
 
-  function pauseRecording(): void {
-    const recorder = recorderRef.current;
-    if (!recorder || !stage.pauseResumeAllowed) return;
-    recorder.pause();
-    stopStageCue();
-    setInputLevel(0);
-    setPhase("PAUSED");
-  }
-
-  function resumeRecording(): void {
-    const recorder = recorderRef.current;
-    if (!recorder || !stage.pauseResumeAllowed) return;
-    recorder.resume();
-    setPhase("RECORDING");
-  }
-
   function redo(): void {
-    if (stageRecordings.length >= 4) {
-      setError("Four Attempts are already stored for this stage.");
-      return;
-    }
     setError(null);
     setElapsedMs(0);
     setInputLevel(0);
@@ -875,33 +865,19 @@ function StagePage({
                 {inputLevel >= 0.16 ? "Voice detected" : "Speak a little louder"}
               </small>
             </div>
-            {stage.pauseResumeAllowed ? (
-              <button type="button" className="btn btn--secondary" onClick={pauseRecording}>
-                Pause
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="stop-recording"
-                aria-label="Stop recording"
-                onClick={() => void finishRecording()}
-              >
-                <span aria-hidden="true" />
-              </button>
-            )}
+            <button
+              type="button"
+              className="stop-recording"
+              aria-label="Stop recording"
+              onClick={() => void finishRecording()}
+            >
+              <span aria-hidden="true" />
+            </button>
           </div>
           <p className="patient-hint">
-            {stage.patientStopAllowed
-              ? "Tap stop when you finish. Maximum 10 seconds."
-              : "This Attempt stops automatically with the cue."}
+            Tap stop when you finish. Maximum {stage.autoStopMs / 1_000} seconds.
           </p>
         </>
-      ) : null}
-
-      {phase === "PAUSED" ? (
-        <button type="button" className="btn btn--primary patient-cta" onClick={resumeRecording}>
-          Resume recording
-        </button>
       ) : null}
 
       {phase === "SAVING" ? (
@@ -947,7 +923,6 @@ function StagePage({
             <button
               type="button"
               className="btn btn--ghost"
-              disabled={stageRecordings.length >= 4}
               onClick={redo}
             >
               Redo
@@ -974,9 +949,13 @@ function EvaluationPage({
   onReset: () => void;
 }) {
   const [selected, setSelected] = useState<Rating | null>(null);
+  const completedStages = MOCK_STAGES.filter(
+    (candidate) => candidate.number <= stage.number,
+  ).map((candidate) => candidate.number);
+  const nextStageNo = stage.number < 5 ? stage.number + 1 : null;
   return (
     <PatientShell onReset={onReset}>
-      <DailyProgress completed={completed} />
+      <DailyProgress completed={Math.min(5, completed + 1)} />
       <div className="evaluation-mark" aria-hidden="true">✦</div>
       <div className="center-copy">
         <p className="eyebrow">Stage {stage.number} · {stage.title}</p>
@@ -1005,6 +984,15 @@ function EvaluationPage({
           </button>
         ))}
       </div>
+      {nextStageNo ? (
+        <section className="stage-handoff" aria-label="Stage progress and next stage">
+          <p className="eyebrow">Stage complete · Up next</p>
+          <PatientStageList
+            completedStages={completedStages}
+            currentStageNo={nextStageNo}
+          />
+        </section>
+      ) : null}
       <button
         type="button"
         className="btn btn--primary patient-cta push-bottom"
