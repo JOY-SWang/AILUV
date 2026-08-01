@@ -974,7 +974,7 @@ function EvaluationPage({
   return (
     <PatientShell onReset={onReset}>
       <DailyProgress completed={Math.min(5, completed + 1)} />
-      <div className="evaluation-mark" aria-hidden="true">✦</div>
+      {/* <div className="evaluation-mark" aria-hidden="true">✦</div> */}
       {nextStageNo ? (
         <section className="stage-handoff" aria-label="Stage progress and next stage">
           <p className="eyebrow">Stage complete · Up next</p>
