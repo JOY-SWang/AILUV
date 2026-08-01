@@ -33,7 +33,6 @@ import {
 type Screen = "code" | "intro" | "protocol" | "stage" | "evaluate" | "complete";
 type Rating = "HAPPY" | "OKAY" | "SAD";
 type PracticePhase =
-  | "INTRO"
   | "DEMO_PLAYING"
   | "READY"
   | "COUNTDOWN"
@@ -555,7 +554,7 @@ function StagePage({
   const stage = mockStage(stageNo);
   const hasAudio = stageHasAudio(stage);
   const [phase, setPhase] = useState<PracticePhase>(
-    hasAudio ? "INTRO" : "READY",
+    hasAudio ? "DEMO_PLAYING" : "READY",
   );
   const [activeSegment, setActiveSegment] = useState(0);
   const [countdown, setCountdown] = useState(stage.countdownSeconds);
@@ -582,9 +581,10 @@ function StagePage({
   }, []);
 
   useEffect(() => {
+    let disposed = false;
     cancelledRef.current = false;
-    setPhase(stageHasAudio(stage) ? "INTRO" : "READY");
-    setActiveSegment(0);
+    setPhase(hasAudio ? "DEMO_PLAYING" : "READY");
+    setActiveSegment(hasAudio ? 1 : 0);
     setCountdown(stage.countdownSeconds);
     setElapsedMs(0);
     setInputLevel(0);
@@ -592,33 +592,35 @@ function StagePage({
     setTapCount(0);
     setLatestRecordingId(null);
     stoppingRef.current = false;
+
+    if (hasAudio) {
+      void playStageCue(stage, setActiveSegment)
+        .then(() => {
+          if (disposed) return;
+          setActiveSegment(0);
+          setPhase("READY");
+        })
+        .catch((caught) => {
+          if (disposed) return;
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "The local cue could not play.",
+          );
+          setActiveSegment(0);
+          setPhase("READY");
+        });
+    }
+
     return () => {
+      disposed = true;
       cancelledRef.current = true;
       clearTimer();
       stopStageCue();
       recorderRef.current?.abort();
       recorderRef.current = null;
     };
-  }, [clearTimer, stage, stage.countdownSeconds, stageNo]);
-
-  async function playDemo(): Promise<void> {
-    if (phase === "DEMO_PLAYING") return;
-    if (!hasAudio) {
-      setPhase("READY");
-      return;
-    }
-    setError(null);
-    setPhase("DEMO_PLAYING");
-    setActiveSegment(1);
-    try {
-      await playStageCue(stage, setActiveSegment);
-      setActiveSegment(0);
-      setPhase("READY");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The local cue could not play.");
-      setPhase("READY");
-    }
-  }
+  }, [clearTimer, hasAudio, stage, stage.countdownSeconds, stageNo]);
 
   async function finishRecording(): Promise<void> {
     if (stoppingRef.current) return;
@@ -727,7 +729,7 @@ function StagePage({
   const isQuestion = stage.key === "QUESTION_ELICITATION";
   const showTimeline = !isQuestion || phase === "RECORDING";
   const instruction =
-    phase === "INTRO" || phase === "DEMO_PLAYING"
+    phase === "DEMO_PLAYING"
       ? stage.demoInstruction
       : stage.practiceInstruction;
 
@@ -785,18 +787,6 @@ function StagePage({
 
       {error ? (
         <div className="banner banner--error" role="alert">{error}</div>
-      ) : null}
-
-      {phase === "INTRO" ? (
-        <>
-          <button type="button" className="btn btn--primary patient-cta" onClick={() => void playDemo()}>
-            <span className="button-icon" aria-hidden="true">▶</span>
-            Play local demonstration
-          </button>
-          <p className="patient-hint">
-            This bundled session recording plays without a backend connection.
-          </p>
-        </>
       ) : null}
 
       {phase === "DEMO_PLAYING" ? (
@@ -945,24 +935,61 @@ function EvaluationPage({
 }: {
   stage: MockStage;
   completed: number;
-  onSubmit: (rating: Rating) => void;
+  onSubmit: (rating: Rating | null) => void;
   onReset: () => void;
 }) {
   const [selected, setSelected] = useState<Rating | null>(null);
+  const autoAdvanceRef = useRef<number | null>(null);
+  const submittedRef = useRef(false);
   const completedStages = MOCK_STAGES.filter(
     (candidate) => candidate.number <= stage.number,
   ).map((candidate) => candidate.number);
   const nextStageNo = stage.number < 5 ? stage.number + 1 : null;
+
+  const clearAutoAdvance = useCallback(() => {
+    if (autoAdvanceRef.current == null) return;
+    window.clearTimeout(autoAdvanceRef.current);
+    autoAdvanceRef.current = null;
+  }, []);
+
+  const submitEvaluation = useCallback(
+    (rating: Rating | null) => {
+      if (submittedRef.current) return;
+      submittedRef.current = true;
+      clearAutoAdvance();
+      onSubmit(rating);
+    },
+    [clearAutoAdvance, onSubmit],
+  );
+
+  useEffect(() => {
+    submittedRef.current = false;
+    autoAdvanceRef.current = window.setTimeout(
+      () => submitEvaluation(null),
+      3_000,
+    );
+    return clearAutoAdvance;
+  }, [clearAutoAdvance, submitEvaluation, stage.number]);
+
   return (
     <PatientShell onReset={onReset}>
       <DailyProgress completed={Math.min(5, completed + 1)} />
       <div className="evaluation-mark" aria-hidden="true">✦</div>
+      {nextStageNo ? (
+        <section className="stage-handoff" aria-label="Stage progress and next stage">
+          <p className="eyebrow">Stage complete · Up next</p>
+          <PatientStageList
+            completedStages={completedStages}
+            currentStageNo={nextStageNo}
+          />
+        </section>
+      ) : null}
       <div className="center-copy">
         <p className="eyebrow">Stage {stage.number} · {stage.title}</p>
         <h1 className="patient-title">How do you feel this time?</h1>
-        <p className="patient-lede">
+        {/* <p className="patient-lede">
           Your choice completes this stage and updates local progress.
-        </p>
+        </p> */}
       </div>
       <div className="patient-sentiment" role="radiogroup" aria-label="How do you feel">
         {RATING_OPTIONS.map((option) => (
@@ -977,27 +1004,21 @@ function EvaluationPage({
             ]
               .filter(Boolean)
               .join(" ")}
-            onClick={() => setSelected(option.id)}
+            onClick={() => {
+              clearAutoAdvance();
+              setSelected(option.id);
+            }}
           >
             <span className="patient-sentiment__face" aria-hidden="true">{option.face}</span>
             <span>{option.label}</span>
           </button>
         ))}
       </div>
-      {nextStageNo ? (
-        <section className="stage-handoff" aria-label="Stage progress and next stage">
-          <p className="eyebrow">Stage complete · Up next</p>
-          <PatientStageList
-            completedStages={completedStages}
-            currentStageNo={nextStageNo}
-          />
-        </section>
-      ) : null}
+      
       <button
         type="button"
         className="btn btn--primary patient-cta push-bottom"
-        disabled={!selected}
-        onClick={() => selected && onSubmit(selected)}
+        onClick={() => submitEvaluation(selected)}
       >
         Continue
       </button>
@@ -1275,20 +1296,23 @@ export function App() {
         completed={progress.completedStages.length}
         onReset={() => void reset()}
         onSubmit={(rating) => {
+          const completedStageNo = progress.stageNo;
           const completedStages = Array.from(
-            new Set([...progress.completedStages, progress.stageNo]),
-          ).sort();
-          const lastStage = progress.stageNo === 5;
-          const nextStage = lastStage ? 5 : progress.stageNo + 1;
-          setProgress((current) => ({
-            ...current,
-            stageNo: nextStage,
-            completedStages,
-            stageRatings: {
-              ...current.stageRatings,
-              [String(progress.stageNo)]: rating,
-            },
-          }));
+            new Set([...progress.completedStages, completedStageNo]),
+          ).sort((left, right) => left - right);
+          const lastStage = completedStageNo === 5;
+          const nextStage = lastStage ? 5 : completedStageNo + 1;
+          setProgress((current) => {
+            const stageRatings = { ...current.stageRatings };
+            if (rating) stageRatings[String(completedStageNo)] = rating;
+            else delete stageRatings[String(completedStageNo)];
+            return {
+              ...current,
+              stageNo: nextStage,
+              completedStages,
+              stageRatings,
+            };
+          });
           navigate(lastStage ? "complete" : "stage", nextStage);
         }}
       />
