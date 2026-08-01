@@ -271,11 +271,11 @@ function CodePage({
     <PatientShell onReset={onReset} showReset={false}>
       <div className="code-hero" aria-hidden="true">
         <span className="code-hero__ring">
-          <span>4</span>
+          <span>♪</span>
         </span>
       </div>
       <div className="center-copy">
-        <p className="eyebrow">Patient practice</p>
+        <p className="eyebrow">Daily Practice</p>
         <h1 className="patient-title">Enter session code</h1>
         <p className="patient-lede">
           Enter the 4-digit code provided by your therapist.
@@ -371,7 +371,7 @@ function IntroPage({
           <span className="session-stat__icon session-stat__icon--clock" aria-hidden="true">⌁</span>
           <div>
             <strong>About {MOCK_SESSION.estimatedMinutes} minutes</strong>
-            <span>Stop recording whenever you need</span>
+            <span>Stop practicing whenever you need</span>
           </div>
         </div>
       </article>
