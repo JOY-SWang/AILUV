@@ -355,7 +355,7 @@ function IntroPage({
       <div className="center-copy intro-heading">
         <span className="welcome-mark" aria-hidden="true">♪</span>
         <p className="eyebrow">{MOCK_SESSION.planDateLabel}</p>
-        <h1 className="patient-title">Hi, M1.3 Checkpoint Patient!</h1>
+        <h1 className="patient-title">Hi, Demo Patient!</h1>
         <p className="patient-subtitle">Today’s practice</p>
       </div>
 
@@ -386,7 +386,7 @@ function IntroPage({
         <span className="headphones-note__icon" aria-hidden="true">◖◗</span>
         <div>
           <strong>Headphones recommended</strong>
-          <p>They keep the reference cue out of your recording so your voice is clearer.</p>
+          {/* <p>They keep the reference cue out of your recording so your voice is clearer.</p> */}
         </div>
       </article>
 
@@ -529,7 +529,7 @@ function CueTimeline({
           ))}
         </div>
       </div>
-      {tapping ? <p className="tap-caption">Tap cue enabled for this stage</p> : null}
+      {tapping ? <p className="tap-caption">Tap cue saved.</p> : null}
     </section>
   );
 }
@@ -966,7 +966,7 @@ function EvaluationPage({
     submittedRef.current = false;
     autoAdvanceRef.current = window.setTimeout(
       () => submitEvaluation(null),
-      3_000,
+      5_000,
     );
     return clearAutoAdvance;
   }, [clearAutoAdvance, submitEvaluation, stage.number]);
@@ -977,7 +977,7 @@ function EvaluationPage({
       {/* <div className="evaluation-mark" aria-hidden="true">✦</div> */}
       {nextStageNo ? (
         <section className="stage-handoff" aria-label="Stage progress and next stage">
-          <p className="eyebrow">Stage complete · Up next</p>
+          <p className="eyebrow">Workflow</p>
           <PatientStageList
             completedStages={completedStages}
             currentStageNo={nextStageNo}
